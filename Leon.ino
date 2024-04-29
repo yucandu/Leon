@@ -34,8 +34,8 @@ typedef struct {
   float volts;
 } sensorReadings;
 
-#define maximumReadings 6 // The maximum number of readings that can be stored in the available space
-#define sleeptimeSecs   5 // Every 10-mins of sleep 10 x 60-secs
+#define maximumReadings 20 // The maximum number of readings that can be stored in the available space
+#define sleeptimeSecs   60 // Every 10-mins of sleep 10 x 60-secs
 #define WIFI_TIMEOUT 10000
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
@@ -300,7 +300,7 @@ void setup(void)
       }
       if (WiFi.status() != WL_CONNECTED && millis() >= WIFI_TIMEOUT) {
         arrayCnt++;
-        prefs.begin("stuff");
+        prefs.begin("stuff", false, "nvs2");
         prefs.putBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         readingCnt = 0;
         gotosleep();
@@ -308,7 +308,7 @@ void setup(void)
       }
       transmitReadings();
       while (arrayCnt > 0) {
-        prefs.begin("stuff");
+        prefs.begin("stuff", false, "nvs2");
         prefs.getBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         arrayCnt--;
         transmitReadings();
