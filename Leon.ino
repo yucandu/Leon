@@ -1,14 +1,21 @@
-#include <WiFi.h>
+#include "esp_wifi.h"
+#include "driver/adc.h"
 
+
+#include <WiFi.h>
+#include "nvs_flash.h"
 #include <SimplePgSQL.h>
 #include "time.h"
 #include <ESP32Time.h>
+#include "SPI.h"
+#include <TFT_eSPI.h> 
 ESP32Time rtc(0);  // offset in seconds, use 0 because NTP already offset
 #include <Adafruit_ADS1X15.h>
 Adafruit_ADS1115 ads;
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
 
+TFT_eSPI tft = TFT_eSPI(); 
 
 #include <Preferences.h>
 Preferences prefs;
@@ -29,7 +36,7 @@ typedef struct {
   float volts;
 } sensorReadings;
 
-#define maximumReadings 120 // The maximum number of readings that can be stored in the available space
+#define maximumReadings 30 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   60 
 #define WIFI_TIMEOUT 12000
 
@@ -228,11 +235,20 @@ error:
 
 
 void gotosleep() {
-      WiFi.disconnect();
+      //WiFi.disconnect();
       delay(1);
       esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000);
+      tft.println("Going to sleep.");  
+      delay(1);
       esp_deep_sleep_start();
       delay(1000);
+}
+
+void killwifi() {
+            WiFi.disconnect(); 
+         // WiFi.mode(WIFI_OFF);
+          //esp_wifi_stop();
+         // adc_power_off();
 }
 
 void transmitReadings() {
@@ -276,22 +292,44 @@ void setup(void)
 {
   //setCpuFrequencyMhz(80);
    // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+ 
   ads.begin();
   ads.setGain(GAIN_ONE); 
+  tft.init();
+  tft.setRotation(0);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
+  tft.setTextWrap(true); // Wrap on width
+  tft.setTextFont(2);
+  tft.setTextSize(2);
+
+  
   if ((readingCnt == -1)) {
+
+    esp_err_t ret = nvs_flash_init();
+    
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        nvs_flash_init();
+    }
+      tft.print("Connecting to get the time...");  
 
       WiFi.begin((char *)ssid, pass);
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
-        delay(10);
+        delay(250);
+          tft.print(".");  
       }
-
+          tft.println("Connected!");  
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
           getLocalTime(&timeinfo);
           rtc.setTimeStruct(timeinfo);
-          WiFi.disconnect(); 
-          readingCnt++;
+          killwifi();
+          readingCnt = 0;
+          delay(1);
+          readingCnt = 0;
           delay(1);
           esp_sleep_enable_timer_wakeup(1 * 1000000);
           esp_deep_sleep_start();
@@ -300,21 +338,40 @@ void setup(void)
 
   sht31.begin(0x44);
   adc0 = ads.readADC_SingleEnded(0);
-  Readings[readingCnt].temp1 = sht31.readTemperature();       // Units °C
-  Readings[readingCnt].temp2 = sht31.readHumidity();
+  float stemp = sht31.readTemperature();
+  float shum = sht31.readHumidity();
+  float volts0 = ads.computeVolts(adc0)*2.0;
+  Readings[readingCnt].temp1 = stemp;    // Units °C
+  Readings[readingCnt].temp2 = shum;
   Readings[readingCnt].time = rtc.getEpoch(); 
-  Readings[readingCnt].volts = ads.computeVolts(adc0)*2.0;
-  readingCnt++;
+  Readings[readingCnt].volts = volts0;
+  
+  tft.print("readingCnt: ");  
+  tft.println(readingCnt);  
+  tft.print("arrayCnt: ");  
+  tft.println(arrayCnt); 
+  tft.print("Temp: ");  
+  tft.println(stemp); 
+  tft.print("Humidity: ");  
+  tft.println(shum); 
+  tft.print("Time: ");  
+  tft.println(rtc.getTime()); 
+  tft.print("Battery: ");  
+  tft.println(volts0); 
+  readingCnt++; 
+  delay(1);
 
   if (readingCnt >= maximumReadings) {
       prefs.begin("stuff", false, "nvs2");
       WiFi.begin((char *)ssid, pass);
-
+      tft.print("Connecting to upload...");  
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
-        delay(10);
+        delay(250);
+          tft.print("."); 
       }
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
-        WiFi.disconnect();
+        tft.println("No WiFi.  Saving to flash...");  
+        killwifi();
         arrayCnt++;
 
         
@@ -323,17 +380,23 @@ void setup(void)
         gotosleep();
       }
       
-
+      tft.println("Transmitting mem readings...");  
       transmitReadings();
       while (arrayCnt > 0) {
+        tft.print("Transmitting flash reading #");  
+        tft.println(arrayCnt);  
         delay(50);
         prefs.getBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         arrayCnt--;
         transmitReadings();
       }
       conn.close();
+      killwifi();
       arrayCnt = 0;
       readingCnt = -1;
+      delay(1);
+      readingCnt = -1;
+      delay(1);
       gotosleep();
   } 
 
