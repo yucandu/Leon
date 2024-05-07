@@ -314,7 +314,9 @@ void setup(void)
       tft.setTextFont(2);
       tft.setTextSize(2);
       tft.print("Connecting to get the time...");  
-
+      WiFi.setAutoReconnect(false);
+      WiFi.persistent(false);
+      WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
@@ -365,12 +367,17 @@ void setup(void)
   tft.println(rtc.getTime()); 
   tft.print("Battery: ");  
   tft.println(volts0); 
-  readingCnt++; 
+  ++readingCnt; 
   delay(1);
 
   if (readingCnt >= maximumReadings) {
       prefs.begin("stuff", false, "nvs2");
+      WiFi.setAutoReconnect(false);
+      WiFi.persistent(false);
+      WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0, 0);
       tft.print("Connecting to upload...");  
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
@@ -379,7 +386,7 @@ void setup(void)
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
         tft.println("No WiFi.  Saving to flash...");  
         delay(1);
-        arrayCnt++;
+        ++arrayCnt;
         delay(1);
         prefs.putBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         readingCnt = 0;
