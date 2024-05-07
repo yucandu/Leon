@@ -36,7 +36,7 @@ typedef struct {
   float volts;
 } sensorReadings;
 
-#define maximumReadings 30 // The maximum number of readings that can be stored in the available space
+#define maximumReadings 10 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   60 
 #define WIFI_TIMEOUT 12000
 
@@ -295,24 +295,24 @@ void setup(void)
  
   ads.begin();
   ads.setGain(GAIN_ONE); 
-  tft.init();
-  tft.setRotation(0);
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
-  tft.setTextWrap(true); // Wrap on width
-  tft.setTextFont(2);
-  tft.setTextSize(2);
 
   
   if ((readingCnt == -1)) {
 
-    esp_err_t ret = nvs_flash_init();
+    /*esp_err_t ret = nvs_flash_init();
     
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         nvs_flash_erase();
         nvs_flash_init();
-    }
+    }*/
+      tft.init();
+      tft.setRotation(0);
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0, 0);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
+      tft.setTextWrap(true); // Wrap on width
+      tft.setTextFont(2);
+      tft.setTextSize(2);
       tft.print("Connecting to get the time...");  
 
       WiFi.begin((char *)ssid, pass);
@@ -345,7 +345,14 @@ void setup(void)
   Readings[readingCnt].temp2 = shum;
   Readings[readingCnt].time = rtc.getEpoch(); 
   Readings[readingCnt].volts = volts0;
-  
+  tft.init();
+  tft.setRotation(0);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
+  tft.setTextWrap(true); // Wrap on width
+  tft.setTextFont(2);
+  tft.setTextSize(2);
   tft.print("readingCnt: ");  
   tft.println(readingCnt);  
   tft.print("arrayCnt: ");  
@@ -371,12 +378,12 @@ void setup(void)
       }
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
         tft.println("No WiFi.  Saving to flash...");  
-        killwifi();
+        delay(1);
         arrayCnt++;
-
-        
+        delay(1);
         prefs.putBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         readingCnt = 0;
+        killwifi();
         gotosleep();
       }
       
@@ -390,13 +397,14 @@ void setup(void)
         arrayCnt--;
         transmitReadings();
       }
-      conn.close();
-      killwifi();
       arrayCnt = 0;
       readingCnt = -1;
       delay(1);
+      arrayCnt = 0;
       readingCnt = -1;
       delay(1);
+      conn.close();
+      killwifi();
       gotosleep();
   } 
 
