@@ -244,6 +244,13 @@ void gotosleep() {
       delay(1000);
 }
 
+void gotosleepfast() {
+      //WiFi.disconnect();
+          esp_sleep_enable_timer_wakeup(1 * 1000000);
+          esp_deep_sleep_start();
+          delay(1000);
+}
+
 void killwifi() {
             WiFi.disconnect(); 
          // WiFi.mode(WIFI_OFF);
@@ -421,7 +428,9 @@ void setup(void)
       tft.println("Killing wifi...");  
       killwifi();
       tft.println("Going to sleep...");  
-      gotosleep();
+      esp_sleep_enable_timer_wakeup(1 * 1000000);
+      esp_deep_sleep_start();
+      delay(1000);
   } 
 
 
