@@ -311,8 +311,8 @@ void setup(void)
       tft.setCursor(0, 0);
       tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
       tft.setTextWrap(true); // Wrap on width
-      tft.setTextFont(2);
-      tft.setTextSize(2);
+      tft.setTextFont(1);
+      tft.setTextSize(1);
       tft.print("Connecting to get the time...");  
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
@@ -322,17 +322,19 @@ void setup(void)
         delay(250);
           tft.print(".");  
       }
-          tft.println("Connected!");  
+          tft.println("Connected!  Configuring time...");  
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
           getLocalTime(&timeinfo);
           rtc.setTimeStruct(timeinfo);
+          tft.println("Killing wifi...");
           killwifi();
           readingCnt = 0;
           delay(1);
           readingCnt = 0;
           delay(1);
+          tft.println("Going to sleep...");
           esp_sleep_enable_timer_wakeup(1 * 1000000);
           esp_deep_sleep_start();
           delay(1000);
@@ -371,6 +373,8 @@ void setup(void)
   delay(1);
 
   if (readingCnt >= maximumReadings) {
+      tft.setTextFont(1);
+      tft.setTextSize(1);
       prefs.begin("stuff", false, "nvs2");
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
@@ -397,6 +401,8 @@ void setup(void)
       tft.println("Transmitting mem readings...");  
       transmitReadings();
       while (arrayCnt > 0) {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0, 0);
         tft.print("Transmitting flash reading #");  
         tft.println(arrayCnt);  
         delay(50);
@@ -410,8 +416,11 @@ void setup(void)
       arrayCnt = 0;
       readingCnt = -1;
       delay(1);
+      tft.println("Closing PGSQL connection...");  
       conn.close();
+      tft.println("Killing wifi...");  
       killwifi();
+      tft.println("Going to sleep...");  
       gotosleep();
   } 
 
