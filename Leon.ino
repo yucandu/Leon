@@ -9,6 +9,14 @@
 #include <ESP32Time.h>
 #include "SPI.h"
 #include <TFT_eSPI.h> 
+#include <Adafruit_INA219.h>
+#include <Adafruit_BMP280.h>
+#include <Adafruit_AHTX0.h>
+
+Adafruit_INA219 ina219;
+Adafruit_AHTX0 aht;
+Adafruit_BMP280 bmp;
+
 ESP32Time rtc(0);  // offset in seconds, use 0 because NTP already offset
 #include <Adafruit_ADS1X15.h>
 Adafruit_ADS1115 ads;
@@ -20,9 +28,9 @@ TFT_eSPI tft = TFT_eSPI();
 #include <Preferences.h>
 Preferences prefs;
 
-#include "Adafruit_SHT31.h"
+//#include "Adafruit_SHT31.h"
 
-Adafruit_SHT31 sht31 = Adafruit_SHT31();
+//Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 RTC_DATA_ATTR int readingCnt = -1;
 RTC_DATA_ATTR int arrayCnt = 0;
@@ -34,6 +42,8 @@ typedef struct {
   float temp2;
   unsigned long   time;
   float volts;
+  float pres;
+  float current;
 } sensorReadings;
 
 #define maximumReadings 10 // The maximum number of readings that can be stored in the available space
@@ -66,7 +76,7 @@ WiFiClient client;
 char buffer[1024];
 PGconnection conn(&client, 0, 1024, buffer);
 
-char tosend[128];
+char tosend[192];
 String tosendstr;
 
 
@@ -149,8 +159,8 @@ void doPg(void)
     }
     if (pg_status == 2) {
         if (!Serial.available()) return;
-        char inbuf[128];
-        int n = Serial.readBytesUntil('\n',inbuf,127);
+        char inbuf[192];
+        int n = Serial.readBytesUntil('\n',inbuf,191);
         while (n > 0) {
             if (isspace(inbuf[n-1])) n--;
             else break;
@@ -261,38 +271,22 @@ void killwifi() {
 void transmitReadings() {
   i=0;
           while (i<maximumReadings) {
-            if (WiFi.status() == WL_CONNECTED) {
+            //if (WiFi.status() == WL_CONNECTED) {
             doPg();
             if ((pg_status == 2) && (i<maximumReadings)){
-              tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + ")";
+              tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + "), (42,4," + String(Readings[i].time) + "," + String(Readings[i].pres,3) + "), (42,5," + String(Readings[i].time) + "," + String(Readings[i].current,2) + ")";
               conn.execute(tosendstr.c_str());
               pg_status = 3;
               delay(50);
               i++;
             }
             delay(50);
-            }
+            
           }
           
 }
 
-void transmitSavedReadings(sensorReadings savedReadings[maximumReadings]) {
-    i=0;
-          while (i<maximumReadings) {
-            if (WiFi.status() == WL_CONNECTED) {
-            doPg();
-            if ((pg_status == 2) && (i<maximumReadings)){
-              tosendstr = "insert into burst values (42,1," + String(savedReadings[i].time) + "," + String(savedReadings[i].temp1,3) + "), (42,2," + String(savedReadings[i].time) + "," + String(savedReadings[i].volts,4) + "), (42,3," + String(savedReadings[i].time) + "," + String(savedReadings[i].temp2,3) + ")";
-              conn.execute(tosendstr.c_str());
-              pg_status = 3;
-              delay(50);
-              i++;
-            }
-            delay(50);
-            }
-          }
-          conn.close();
-}
+
 
 
 void setup(void)
@@ -329,7 +323,9 @@ void setup(void)
         delay(250);
           tft.print(".");  
       }
-          tft.println("Connected!  Configuring time...");  
+          tft.println("Connected! ");
+          tft.println(WiFi.RSSI());
+          tft.println(" Configuring time...");  
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
@@ -347,15 +343,14 @@ void setup(void)
           delay(1000);
   }
 
-  sht31.begin(0x44);
+  //sht31.begin(0x44);
   adc0 = ads.readADC_SingleEnded(0);
-  float stemp = sht31.readTemperature();
-  float shum = sht31.readHumidity();
+  //float stemp = sht31.readTemperature();
+  //float shum = sht31.readHumidity();
   float volts0 = ads.computeVolts(adc0)*2.0;
-  Readings[readingCnt].temp1 = stemp;    // Units °C
-  Readings[readingCnt].temp2 = shum;
-  Readings[readingCnt].time = rtc.getEpoch(); 
-  Readings[readingCnt].volts = volts0;
+  ina219.begin();
+  ina219.setCalibration_16V_400mA();
+  float current_mA = ina219.getCurrent_mA();
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
@@ -363,19 +358,45 @@ void setup(void)
   tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
   tft.setTextWrap(true); // Wrap on width
   tft.setTextFont(2);
-  tft.setTextSize(2);
+  tft.setTextSize(1);
+  bmp.begin();
+  bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500);
+  bmp.takeForcedMeasurement();
+  float presread = bmp.readPressure() / 100.0;
+  aht.begin();
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
+
+  Readings[readingCnt].temp1 = temp.temperature;    // Units °C
+  Readings[readingCnt].temp2 = humidity.relative_humidity; //humidity is temp2
+  Readings[readingCnt].time = rtc.getEpoch(); 
+  Readings[readingCnt].volts = volts0;
+  Readings[readingCnt].pres = presread;
+  Readings[readingCnt].current = current_mA;
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0);
+
   tft.print("readingCnt: ");  
   tft.println(readingCnt);  
   tft.print("arrayCnt: ");  
   tft.println(arrayCnt); 
   tft.print("Temp: ");  
-  tft.println(stemp); 
+  tft.println(temp.temperature); 
   tft.print("Humidity: ");  
-  tft.println(shum); 
+  tft.println(humidity.relative_humidity); 
   tft.print("Time: ");  
   tft.println(rtc.getTime()); 
   tft.print("Battery: ");  
   tft.println(volts0); 
+  tft.print("Pres: ");  
+  tft.println(presread); 
+  tft.print("Current: ");  
+  tft.println(current_mA); 
   ++readingCnt; 
   delay(1);
 
@@ -404,12 +425,13 @@ void setup(void)
         killwifi();
         gotosleep();
       }
-      
+      tft.println(WiFi.RSSI());
       tft.println("Transmitting mem readings...");  
       transmitReadings();
       while (arrayCnt > 0) {
         tft.fillScreen(TFT_BLACK);
         tft.setCursor(0, 0);
+        tft.println(WiFi.RSSI());
         tft.print("Transmitting flash reading #");  
         tft.println(arrayCnt);  
         delay(50);
