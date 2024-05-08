@@ -8,7 +8,7 @@
 #include "time.h"
 #include <ESP32Time.h>
 #include "SPI.h"
-#include <TFT_eSPI.h> 
+//#include <TFT_eSPI.h> 
 #include <Adafruit_INA219.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
@@ -23,7 +23,7 @@ Adafruit_ADS1115 ads;
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
 
-TFT_eSPI tft = TFT_eSPI(); 
+//TFT_eSPI tft = TFT_eSPI(); 
 
 #include <Preferences.h>
 Preferences prefs;
@@ -46,7 +46,7 @@ typedef struct {
   float current;
 } sensorReadings;
 
-#define maximumReadings 10 // The maximum number of readings that can be stored in the available space
+#define maximumReadings 60 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   60 
 #define WIFI_TIMEOUT 12000
 
@@ -248,7 +248,6 @@ void gotosleep() {
       //WiFi.disconnect();
       delay(1);
       esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000);
-      tft.println("Going to sleep.");  
       delay(1);
       esp_deep_sleep_start();
       delay(1000);
@@ -306,59 +305,39 @@ void setup(void)
         nvs_flash_erase();
         nvs_flash_init();
     }*/
-      tft.init();
-      tft.setRotation(0);
-      tft.fillScreen(TFT_BLACK);
-      tft.setCursor(0, 0);
-      tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
-      tft.setTextWrap(true); // Wrap on width
-      tft.setTextFont(1);
-      tft.setTextSize(1);
-      tft.print("Connecting to get the time...");  
+
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
-          tft.print(".");  
       }
-          tft.println("Connected! ");
-          tft.println(WiFi.RSSI());
-          tft.println(" Configuring time...");  
+
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
           getLocalTime(&timeinfo);
           rtc.setTimeStruct(timeinfo);
-          tft.println("Killing wifi...");
           killwifi();
           readingCnt = 0;
           delay(1);
           readingCnt = 0;
           delay(1);
-          tft.println("Going to sleep...");
+
           esp_sleep_enable_timer_wakeup(1 * 1000000);
           esp_deep_sleep_start();
           delay(1000);
   }
 
-  //sht31.begin(0x44);
+
   adc0 = ads.readADC_SingleEnded(0);
-  //float stemp = sht31.readTemperature();
-  //float shum = sht31.readHumidity();
+
   float volts0 = ads.computeVolts(adc0)*2.0;
   ina219.begin();
   ina219.setCalibration_16V_400mA();
   float current_mA = ina219.getCurrent_mA();
-  tft.init();
-  tft.setRotation(0);
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
-  tft.setTextWrap(true); // Wrap on width
-  tft.setTextFont(2);
-  tft.setTextSize(1);
+
   bmp.begin();
   bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
                   Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
@@ -378,45 +357,24 @@ void setup(void)
   Readings[readingCnt].pres = presread;
   Readings[readingCnt].current = current_mA;
 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0, 0);
 
-  tft.print("readingCnt: ");  
-  tft.println(readingCnt);  
-  tft.print("arrayCnt: ");  
-  tft.println(arrayCnt); 
-  tft.print("Temp: ");  
-  tft.println(temp.temperature); 
-  tft.print("Humidity: ");  
-  tft.println(humidity.relative_humidity); 
-  tft.print("Time: ");  
-  tft.println(rtc.getTime()); 
-  tft.print("Battery: ");  
-  tft.println(volts0); 
-  tft.print("Pres: ");  
-  tft.println(presread); 
-  tft.print("Current: ");  
-  tft.println(current_mA); 
   ++readingCnt; 
   delay(1);
 
   if (readingCnt >= maximumReadings) {
-      tft.setTextFont(1);
-      tft.setTextSize(1);
+
       prefs.begin("stuff", false, "nvs2");
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
-      tft.fillScreen(TFT_BLACK);
-      tft.setCursor(0, 0);
-      tft.print("Connecting to upload...");  
+
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
-          tft.print("."); 
+
       }
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
-        tft.println("No WiFi.  Saving to flash...");  
+
         delay(1);
         ++arrayCnt;
         delay(1);
@@ -425,15 +383,10 @@ void setup(void)
         killwifi();
         gotosleep();
       }
-      tft.println(WiFi.RSSI());
-      tft.println("Transmitting mem readings...");  
+
       transmitReadings();
       while (arrayCnt > 0) {
-        tft.fillScreen(TFT_BLACK);
-        tft.setCursor(0, 0);
-        tft.println(WiFi.RSSI());
-        tft.print("Transmitting flash reading #");  
-        tft.println(arrayCnt);  
+
         delay(50);
         prefs.getBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         arrayCnt--;
@@ -445,11 +398,11 @@ void setup(void)
       arrayCnt = 0;
       readingCnt = -1;
       delay(1);
-      tft.println("Closing PGSQL connection...");  
+
       conn.close();
-      tft.println("Killing wifi...");  
+
       killwifi();
-      tft.println("Going to sleep...");  
+
       esp_sleep_enable_timer_wakeup(1 * 1000000);
       esp_deep_sleep_start();
       delay(1000);
