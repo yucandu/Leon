@@ -9,15 +9,21 @@
 #include <ESP32Time.h>
 #include "SPI.h"
 //#include <TFT_eSPI.h> 
-#include <Adafruit_INA219.h>
+
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_PCD8544.h>
 
-Adafruit_INA219 ina219;
+
+ Adafruit_PCD8544 display = Adafruit_PCD8544(0, 1, 2);
+
+
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
-ESP32Time rtc(0);  // offset in seconds, use 0 because NTP already offset
+ESP32Time rtc(-14400);  // offset in seconds, use 0 because NTP already offset
 #include <Adafruit_ADS1X15.h>
 Adafruit_ADS1115 ads;
 int16_t adc0, adc1, adc2, adc3;
@@ -43,7 +49,6 @@ typedef struct {
   unsigned long   time;
   float volts;
   float pres;
-  float current;
 } sensorReadings;
 
 #define maximumReadings 60 // The maximum number of readings that can be stored in the available space
@@ -273,7 +278,7 @@ void transmitReadings() {
             //if (WiFi.status() == WL_CONNECTED) {
             doPg();
             if ((pg_status == 2) && (i<maximumReadings)){
-              tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + "), (42,4," + String(Readings[i].time) + "," + String(Readings[i].pres,3) + "), (42,5," + String(Readings[i].time) + "," + String(Readings[i].current,2) + ")";
+              tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + "), (42,4," + String(Readings[i].time) + "," + String(Readings[i].pres,3) + ")";
               conn.execute(tosendstr.c_str());
               pg_status = 3;
               delay(50);
@@ -295,8 +300,16 @@ void setup(void)
  
   ads.begin();
   ads.setGain(GAIN_ONE); 
+  display.begin(21, 7);
 
-  
+
+  display.display(); // show splashscreen
+  //delay(1000);
+  display.clearDisplay();   // clears the screen and buffer
+  display.setTextSize(1);
+  display.setTextColor(BLACK);
+  display.setCursor(0,0);
+  display.setTextWrap(true);
   if ((readingCnt == -1)) {
 
     /*esp_err_t ret = nvs_flash_init();
@@ -310,10 +323,17 @@ void setup(void)
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
+      display.print("Connecting to get time...");
+      display.display();
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
+        display.print(".");
+        display.display();
       }
-
+          display.clearDisplay();   // clears the screen and buffer
+          display.setCursor(0,0);
+          display.print("Connected. Getting time...");
+          display.display();
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
@@ -331,12 +351,10 @@ void setup(void)
   }
 
 
-  adc0 = ads.readADC_SingleEnded(0);
+  adc0 = ads.readADC_SingleEnded(3);
 
   float volts0 = ads.computeVolts(adc0)*2.0;
-  ina219.begin();
-  ina219.setCalibration_16V_400mA();
-  float current_mA = ina219.getCurrent_mA();
+
 
   bmp.begin();
   bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
@@ -350,12 +368,40 @@ void setup(void)
   sensors_event_t humidity, temp;
   aht.getEvent(&humidity, &temp);
 
+  display.print("Time: ");
+  display.print(rtc.getHour());
+  display.print(":");    
+  display.print(rtc.getMinute());
+  display.println(rtc.getAmPm());
+
+  display.print("Temp: ");
+  display.print(temp.temperature, 1);
+  display.println("C");
+
+  display.print("Hum: ");
+  display.print(humidity.relative_humidity, 1);
+  display.println("%");
+
+  display.print("Volts: ");
+  display.print(volts0, 4);
+  display.println("v");
+
+  display.print("Pres: ");
+  display.print(presread, 1);
+  display.println("m");
+
+  display.print("R: ");
+  display.print(readingCnt);
+  display.print(" A: ");
+  display.print(arrayCnt);
+  display.display();
+
   Readings[readingCnt].temp1 = temp.temperature;    // Units °C
   Readings[readingCnt].temp2 = humidity.relative_humidity; //humidity is temp2
   Readings[readingCnt].time = rtc.getEpoch(); 
   Readings[readingCnt].volts = volts0;
   Readings[readingCnt].pres = presread;
-  Readings[readingCnt].current = current_mA;
+
 
 
   ++readingCnt; 
@@ -368,11 +414,17 @@ void setup(void)
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
       WiFi.begin((char *)ssid, pass);
-
+      display.clearDisplay();   // clears the screen and buffer
+      display.setCursor(0,0);
+      display.print("Connecting to transmit...");
+      display.display();
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
         delay(250);
-
+        display.print(".");
+        display.display();
       }
+
+
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
 
         delay(1);
@@ -383,10 +435,17 @@ void setup(void)
         killwifi();
         gotosleep();
       }
-
+      display.clearDisplay();   // clears the screen and buffer
+      display.setCursor(0,0);
+      display.print("Connected.");
+      display.display();
       transmitReadings();
       while (arrayCnt > 0) {
-
+        display.clearDisplay();   // clears the screen and buffer
+        display.setCursor(0,0);
+        display.print("Transmitting #");
+        display.print(arrayCnt);
+        display.display();
         delay(50);
         prefs.getBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         arrayCnt--;
