@@ -300,7 +300,7 @@ void setup(void)
  
   ads.begin();
   ads.setGain(GAIN_ONE); 
-  display.begin(21, 7);
+  display.begin(20, 7);
 
 
   display.display(); // show splashscreen
@@ -370,7 +370,9 @@ void setup(void)
 
   display.print("Time: ");
   display.print(rtc.getHour());
-  display.print(":");    
+  if (rtc.getMinute() < 10) {display.print(":0");}
+  else {display.print(":");}
+  
   display.print(rtc.getMinute());
   display.println(rtc.getAmPm());
 
@@ -398,7 +400,7 @@ void setup(void)
 
   Readings[readingCnt].temp1 = temp.temperature;    // Units °C
   Readings[readingCnt].temp2 = humidity.relative_humidity; //humidity is temp2
-  Readings[readingCnt].time = rtc.getEpoch(); 
+  Readings[readingCnt].time = rtc.getLocalEpoch(); 
   Readings[readingCnt].volts = volts0;
   Readings[readingCnt].pres = presread;
 
