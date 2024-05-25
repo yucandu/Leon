@@ -300,7 +300,7 @@ void setup(void)
  
   ads.begin();
   ads.setGain(GAIN_ONE); 
-  display.begin(20, 7);
+  display.begin(20, 23);
 
 
   display.display(); // show splashscreen
@@ -377,11 +377,11 @@ void setup(void)
   display.println(rtc.getAmPm());
 
   display.print("Temp: ");
-  display.print(temp.temperature, 1);
+  display.print(temp.temperature, 2);
   display.println("C");
 
   display.print("Hum: ");
-  display.print(humidity.relative_humidity, 1);
+  display.print(humidity.relative_humidity, 2);
   display.println("%");
 
   display.print("Volts: ");
@@ -389,12 +389,12 @@ void setup(void)
   display.println("v");
 
   display.print("Pres: ");
-  display.print(presread, 1);
+  display.print(presread, 2);
   display.println("m");
 
   display.print("R: ");
   display.print(readingCnt);
-  display.print(" A: ");
+  display.print("/60 A: ");
   display.print(arrayCnt);
   display.display();
 
@@ -439,7 +439,7 @@ void setup(void)
       }
       display.clearDisplay();   // clears the screen and buffer
       display.setCursor(0,0);
-      display.print("Connected.");
+      display.print("Connected. Transmitting #0");
       display.display();
       transmitReadings();
       while (arrayCnt > 0) {
