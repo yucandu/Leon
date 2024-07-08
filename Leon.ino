@@ -28,6 +28,7 @@ ESP32Time rtc(-14400);  // offset in seconds, use 0 because NTP already offset
 Adafruit_ADS1115 ads;
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
+float abshum;
 
 //TFT_eSPI tft = TFT_eSPI(); 
 
@@ -53,7 +54,7 @@ typedef struct {
 
 #define maximumReadings 60 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   60 
-#define WIFI_TIMEOUT 12000
+#define WIFI_TIMEOUT 15000
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
 
@@ -300,7 +301,7 @@ void setup(void)
  
   ads.begin();
   ads.setGain(GAIN_ONE); 
-  display.begin(20, 23);
+  display.begin(20, 7);
 
 
   display.display(); // show splashscreen
@@ -322,6 +323,7 @@ void setup(void)
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
+      WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
       display.print("Connecting to get time...");
       display.display();
@@ -367,7 +369,7 @@ void setup(void)
   aht.begin();
   sensors_event_t humidity, temp;
   aht.getEvent(&humidity, &temp);
-
+  abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature); //calculate absolute humidity
   display.print("Time: ");
   display.print(rtc.getHour());
   if (rtc.getMinute() < 10) {display.print(":0");}
@@ -381,8 +383,8 @@ void setup(void)
   display.println("C");
 
   display.print("Hum: ");
-  display.print(humidity.relative_humidity, 2);
-  display.println("%");
+  display.print(abshum, 2);
+  display.println("g");
 
   display.print("Volts: ");
   display.print(volts0, 4);
@@ -399,7 +401,7 @@ void setup(void)
   display.display();
 
   Readings[readingCnt].temp1 = temp.temperature;    // Units °C
-  Readings[readingCnt].temp2 = humidity.relative_humidity; //humidity is temp2
+  Readings[readingCnt].temp2 = abshum; //humidity is temp2
   Readings[readingCnt].time = rtc.getLocalEpoch(); 
   Readings[readingCnt].volts = volts0;
   Readings[readingCnt].pres = presread;
@@ -415,6 +417,7 @@ void setup(void)
       WiFi.setAutoReconnect(false);
       WiFi.persistent(false);
       WiFi.disconnect(false,true); 
+      WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
       display.clearDisplay();   // clears the screen and buffer
       display.setCursor(0,0);
