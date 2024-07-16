@@ -15,7 +15,11 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
+#include <ADS1115_WE.h> 
+#include <Wire.h>
+#define I2C_ADDRESS 0x48
 
+ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 
  Adafruit_PCD8544 display = Adafruit_PCD8544(0, 1, 2);
 
@@ -24,8 +28,7 @@ Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
 ESP32Time rtc(-14400);  // offset in seconds, use 0 because NTP already offset
-#include <Adafruit_ADS1X15.h>
-Adafruit_ADS1115 ads;
+
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
 float abshum;
@@ -293,15 +296,23 @@ void transmitReadings() {
 }
 
 
-
+float readChannel(ADS1115_MUX channel) {
+  float voltage = 0.0;
+  adc.setCompareChannels(channel);
+  adc.startSingleMeasurement();
+  while(adc.isBusy()){}
+  voltage = adc.getResult_V(); // alternative: getResult_mV for Millivolt
+  return voltage;
+}
 
 void setup(void)
 {
   //setCpuFrequencyMhz(80);
    // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
  
-  ads.begin();
-  ads.setGain(GAIN_ONE); 
+Wire.begin();
+adc.init();
+adc.setVoltageRange_mV(ADS1115_RANGE_4096);
   display.begin(20, 7);
 
 
@@ -354,9 +365,8 @@ void setup(void)
   }
 
 
-  adc0 = ads.readADC_SingleEnded(3);
 
-  float volts0 = ads.computeVolts(adc0)*2.0;
+  float volts0 = 2.0 * readChannel(ADS1115_COMP_3_GND);
 
 
   bmp.begin();
