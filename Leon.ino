@@ -52,8 +52,8 @@ typedef struct {
   float pres;
 } sensorReadings;
 
-#define maximumReadings 60 // The maximum number of readings that can be stored in the available space
-#define sleeptimeSecs   60 
+#define maximumReadings 120 // The maximum number of readings that can be stored in the available space
+#define sleeptimeSecs   30 
 #define WIFI_TIMEOUT 15000
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
@@ -65,13 +65,14 @@ int hours, mins, secs;
 float tempC;
 bool sent = false;
 
-IPAddress PGIP(192,168,50,197);        // your PostgreSQL server IP
+//IPAddress PGIP(192,168,50,197);        // your PostgreSQL server IP 
+IPAddress PGIP(xxx,xxx,xxx,xxx);
 
 const char ssid[] = "mikesnet";      //  your network SSID (name)
 const char pass[] = "springchicken";      // your network password
 
-const char user[] = "test";       // your database user
-const char password[] = "test";   // your database password
+const char user[] = "xxx";       // your database user
+const char password[] = "xxx";   // your database password
 const char dbname[] = "blynk_reporting";         // your database name
 
 
@@ -378,15 +379,16 @@ void setup(void)
   display.print(rtc.getMinute());
   display.println(rtc.getAmPm());
 
-  display.print("Temp: ");
   display.print(temp.temperature, 2);
-  display.println("C");
+  display.print("C ");
+  display.print(humidity.relative_humidity, 1);
+  display.println("%");
 
-  display.print("Hum: ");
+  display.print("Abs: ");
   display.print(abshum, 2);
   display.println("g");
 
-  display.print("Volts: ");
+  display.print("Batt: ");
   display.print(volts0, 4);
   display.println("v");
 
@@ -395,8 +397,10 @@ void setup(void)
   display.println("m");
 
   display.print("R: ");
-  display.print(readingCnt);
-  display.print("/60 A: ");
+  display.print(readingCnt); 
+  display.print("/");
+  display.print(maximumReadings); 
+  display.print(" A: ");
   display.print(arrayCnt);
   display.display();
 
