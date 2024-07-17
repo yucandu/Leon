@@ -55,7 +55,7 @@ typedef struct {
   float pres;
 } sensorReadings;
 
-#define maximumReadings 120 // The maximum number of readings that can be stored in the available space
+#define maximumReadings 360 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   30 
 #define WIFI_TIMEOUT 15000
 
@@ -69,13 +69,13 @@ float tempC;
 bool sent = false;
 
 //IPAddress PGIP(192,168,50,197);        // your PostgreSQL server IP 
-IPAddress PGIP(xxx,xxx,xxx,xxx);
+IPAddress PGIP(216,110,224,105);
 
 const char ssid[] = "mikesnet";      //  your network SSID (name)
 const char pass[] = "springchicken";      // your network password
 
-const char user[] = "xxx";       // your database user
-const char password[] = "xxx";   // your database password
+const char user[] = "wanburst";       // your database user
+const char password[] = "elec&9";   // your database password
 const char dbname[] = "blynk_reporting";         // your database name
 
 
@@ -286,10 +286,10 @@ void transmitReadings() {
               tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + "), (42,4," + String(Readings[i].time) + "," + String(Readings[i].pres,3) + ")";
               conn.execute(tosendstr.c_str());
               pg_status = 3;
-              delay(50);
+              delay(10);
               i++;
             }
-            delay(50);
+            delay(10);
             
           }
           
@@ -406,11 +406,11 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
   display.print(presread, 2);
   display.println("m");
 
-  display.print("R: ");
+  display.print("R");
   display.print(readingCnt); 
   display.print("/");
   display.print(maximumReadings); 
-  display.print(" A: ");
+  display.print(" A");
   display.print(arrayCnt);
   display.display();
 
