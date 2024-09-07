@@ -12,7 +12,7 @@
 
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
-#include <SPI.h>
+
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
 #include <ADS1115_WE.h> 
@@ -57,7 +57,7 @@ typedef struct {
 
 #define maximumReadings 360 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   30 
-#define WIFI_TIMEOUT 15000
+#define WIFI_TIMEOUT 20000
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
 
@@ -257,7 +257,7 @@ error:
 void gotosleep() {
       //WiFi.disconnect();
       delay(1);
-      esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000);
+      esp_sleep_enable_timer_wakeup(sleeptimeSecs * 1000000ULL);
       delay(1);
       esp_deep_sleep_start();
       delay(1000);
@@ -282,6 +282,14 @@ void transmitReadings() {
           while (i<maximumReadings) {
             //if (WiFi.status() == WL_CONNECTED) {
             doPg();
+            display.clearDisplay();   // clears the screen and buffer
+            display.setCursor(0,0);
+            display.print("TXing #");
+            display.print(i);
+            display.print(",");
+            display.println(arrayCnt);
+            display.display();
+
             if ((pg_status == 2) && (i<maximumReadings)){
               tosendstr = "insert into burst values (42,1," + String(Readings[i].time) + "," + String(Readings[i].temp1,3) + "), (42,2," + String(Readings[i].time) + "," + String(Readings[i].volts,4) + "), (42,3," + String(Readings[i].time) + "," + String(Readings[i].temp2,3) + "), (42,4," + String(Readings[i].time) + "," + String(Readings[i].pres,3) + ")";
               conn.execute(tosendstr.c_str());
@@ -332,9 +340,9 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
         nvs_flash_init();
     }*/
 
-      WiFi.setAutoReconnect(false);
-      WiFi.persistent(false);
-      WiFi.disconnect(false,true); 
+     // WiFi.setAutoReconnect(false);
+      //WiFi.persistent(false);
+      //WiFi.disconnect(false,true); 
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
       display.print("Connecting to get time...");
@@ -428,9 +436,9 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
   if (readingCnt >= maximumReadings) {
 
       prefs.begin("stuff", false, "nvs2");
-      WiFi.setAutoReconnect(false);
-      WiFi.persistent(false);
-      WiFi.disconnect(false,true); 
+      //WiFi.setAutoReconnect(false);
+      //WiFi.persistent(false);
+      //WiFi.disconnect(false,true); 
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
       display.clearDisplay();   // clears the screen and buffer
@@ -452,7 +460,9 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
         prefs.putBytes(String(arrayCnt).c_str(), &Readings, sizeof(Readings));
         readingCnt = 0;
         killwifi();
-        gotosleep();
+        esp_sleep_enable_timer_wakeup(1 * 1000000);
+        esp_deep_sleep_start();
+        delay(1000);
       }
       display.clearDisplay();   // clears the screen and buffer
       display.setCursor(0,0);
@@ -476,14 +486,15 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
       arrayCnt = 0;
       readingCnt = -1;
       delay(1);
-
+      display.clearDisplay();   // clears the screen and buffer
+      display.setCursor(0,0);
+      display.print("Done.  Closing connection...");
+      display.display();
       conn.close();
 
       killwifi();
 
-      esp_sleep_enable_timer_wakeup(1 * 1000000);
-      esp_deep_sleep_start();
-      delay(1000);
+      ESP.restart();
   } 
 
 
