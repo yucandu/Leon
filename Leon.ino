@@ -61,7 +61,7 @@ typedef struct {
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
 
-const char* ntpServer = "time.cloudflare.com";
+const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 3600;   //Replace with your daylight offset (secs)
 int hours, mins, secs;
@@ -353,6 +353,7 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
         display.print(".");
         display.display();
       }
+      //WiFi.setTxPower(WIFI_POWER_19_5dBm);
           display.clearDisplay();   // clears the screen and buffer
           display.setCursor(0,0);
           if (WiFi.status() == WL_CONNECTED) {
@@ -448,6 +449,7 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
       //WiFi.disconnect(false,true); 
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
+      WiFi.setTxPower(WIFI_POWER_8_5dBm);
       display.clearDisplay();   // clears the screen and buffer
       display.setCursor(0,0);
       display.print("Connecting to transmit...");
@@ -457,7 +459,7 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
         display.print(".");
         display.display();
       }
-
+      //WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
 
