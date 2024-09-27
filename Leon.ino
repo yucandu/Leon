@@ -61,7 +61,7 @@ typedef struct {
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
 
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer = "time.cloudflare.com";
 const long gmtOffset_sec = -18000;  //Replace with your GMT offset (secs)
 const int daylightOffset_sec = 3600;   //Replace with your daylight offset (secs)
 int hours, mins, secs;
@@ -345,6 +345,7 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
       //WiFi.disconnect(false,true); 
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
+      WiFi.setTxPower(WIFI_POWER_8_5dBm);
       display.print("Connecting to get time...");
       display.display();
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
@@ -354,13 +355,19 @@ adc.setVoltageRange_mV(ADS1115_RANGE_4096);
       }
           display.clearDisplay();   // clears the screen and buffer
           display.setCursor(0,0);
-          display.print("Connected. Getting time...");
+          if (WiFi.status() == WL_CONNECTED) {
+            display.print("Connected. Getting time...");
+          }
+          else
+          {
+            display.print("Connection timed out. :(");
+          }
           display.display();
           configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
           
           struct tm timeinfo;
-          getLocalTime(&timeinfo);
-          rtc.setTimeStruct(timeinfo);
+          if (getLocalTime(&timeinfo)){
+          rtc.setTimeStruct(timeinfo);}
           killwifi();
           readingCnt = 0;
           delay(1);
