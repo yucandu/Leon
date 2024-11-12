@@ -8,7 +8,7 @@
 #include "time.h"
 #include <ESP32Time.h>
 #include "SPI.h"
-//#include <TFT_eSPI.h> 
+
 
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
@@ -17,6 +17,16 @@
 #include <Adafruit_PCD8544.h>
 #include <ADS1115_WE.h> 
 #include <Wire.h>
+bool isSetNtp = false;                                 // flag to indicate if we had a successful NTP call
+            // test variable in RTC memory
+
+// callback to check if NTP was called
+#include "esp_sntp.h"
+void cbSyncTime(struct timeval *tv) { // callback function to show when NTP was synchronized
+  Serial.println("NTP time synched");
+  isSetNtp = true;
+}
+
 #define I2C_ADDRESS 0x48
 
 ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
@@ -27,20 +37,17 @@ ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
-ESP32Time rtc(-14400);  // offset in seconds, use 0 because NTP already offset
+ESP32Time rtc(-18000);  // offset in seconds
 
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
 float abshum;
 
-//TFT_eSPI tft = TFT_eSPI(); 
+
 
 #include <Preferences.h>
 Preferences prefs;
-
-//#include "Adafruit_SHT31.h"
-
-//Adafruit_SHT31 sht31 = Adafruit_SHT31();
+  struct tm timeinfo;
 
 RTC_DATA_ATTR int readingCnt = -1;
 RTC_DATA_ATTR int arrayCnt = 0;
@@ -58,6 +65,7 @@ typedef struct {
 #define maximumReadings 360 // The maximum number of readings that can be stored in the available space
 #define sleeptimeSecs   30 
 #define WIFI_TIMEOUT 20000
+#define TIME_TIMEOUT 20000
 
 RTC_DATA_ATTR sensorReadings Readings[maximumReadings];
 
@@ -68,7 +76,7 @@ int hours, mins, secs;
 float tempC;
 bool sent = false;
 
-//IPAddress PGIP(192,168,50,197);        // your PostgreSQL server IP 
+
 IPAddress PGIP(216,110,224,105);
 
 const char ssid[] = "mikesnet";      //  your network SSID (name)
@@ -81,6 +89,18 @@ const char dbname[] = "blynk_reporting";         // your database name
 
 int WiFiStatus;
 WiFiClient client;
+
+
+
+
+
+/////////////////////////
+//POSTGRESQL CODE BEGIN//
+/////////////////////////
+
+
+
+
 
 
 char buffer[1024];
@@ -254,6 +274,23 @@ error:
 
 
 
+
+
+
+
+
+/////////////////////////
+//POSTGRESQL CODE END  //
+/////////////////////////
+
+
+
+
+
+
+
+
+
 void gotosleep() {
       //WiFi.disconnect();
       delay(1);
@@ -263,24 +300,14 @@ void gotosleep() {
       delay(1000);
 }
 
-void gotosleepfast() {
-      //WiFi.disconnect();
-          esp_sleep_enable_timer_wakeup(1 * 1000000);
-          esp_deep_sleep_start();
-          delay(1000);
-}
 
 void killwifi() {
             WiFi.disconnect(); 
-         // WiFi.mode(WIFI_OFF);
-          //esp_wifi_stop();
-         // adc_power_off();
 }
 
 void transmitReadings() {
   i=0;
           while (i<maximumReadings) {
-            //if (WiFi.status() == WL_CONNECTED) {
             doPg();
             display.clearDisplay();   // clears the screen and buffer
             display.setCursor(0,0);
@@ -313,17 +340,34 @@ float readChannel(ADS1115_MUX channel) {
   return voltage;
 }
 
+void setTimezone(String timezone){
+  //Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
+  setenv("TZ",timezone.c_str(),1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+  tzset();
+}
+
+void initTime(String timezone){
+  configTime(0, 0, "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
+  //delay(2500);
+
+  
+  while ((!isSetNtp) && (millis() < TIME_TIMEOUT)) {
+        delay(250);
+        display.print(".");
+        display.display();
+        }
+  setTimezone(timezone);
+  getLocalTime(&timeinfo, 10000);
+}
+
+
 void setup(void)
 {
-  //setCpuFrequencyMhz(80);
-   // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
- 
-
+  sntp_set_time_sync_notification_cb(cbSyncTime);
   display.begin(20, 7);
 
 
   display.display(); // show splashscreen
-  //delay(1000);
   display.clearDisplay();   // clears the screen and buffer
   display.setTextSize(1);
   display.setTextColor(BLACK);
@@ -331,19 +375,8 @@ void setup(void)
   display.setTextWrap(true);
   if ((readingCnt == -1)) {
 
-    /*esp_err_t ret = nvs_flash_init();
-    
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        nvs_flash_init();
-    }*/
-
-     // WiFi.setAutoReconnect(false);
-      //WiFi.persistent(false);
-      //WiFi.disconnect(false,true); 
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
-      //WiFi.setTxPower(WIFI_POWER_8_5dBm);
       display.print("Connecting to get time...");
       display.display();
       while ((WiFi.status() != WL_CONNECTED) && (millis() < WIFI_TIMEOUT)) {
@@ -351,7 +384,6 @@ void setup(void)
         display.print(".");
         display.display();
       }
-      //WiFi.setTxPower(WIFI_POWER_19_5dBm);
           display.clearDisplay();   // clears the screen and buffer
           display.setCursor(0,0);
           if (WiFi.status() == WL_CONNECTED) {
@@ -362,11 +394,8 @@ void setup(void)
             display.print("Connection timed out. :(");
           }
           display.display();
-          configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-          
-          struct tm timeinfo;
-          if (getLocalTime(&timeinfo)){
-          rtc.setTimeStruct(timeinfo);}
+          initTime("EST5EDT,M3.2.0,M11.1.0");
+          rtc.setTimeStruct(timeinfo);
           killwifi();
           readingCnt = 0;
           delay(1);
@@ -430,6 +459,7 @@ void setup(void)
   display.print(arrayCnt);
   display.display();
 
+  //Store the sensor readings in the struct we declared earlier, using the RTC-ram integer "readingCnt" to increment the array index by one each reading
   Readings[readingCnt].temp1 = temp.temperature;    // Units °C
   Readings[readingCnt].temp2 = abshum; //humidity is temp2
   Readings[readingCnt].time = rtc.getLocalEpoch(); 
@@ -441,15 +471,11 @@ void setup(void)
   ++readingCnt; 
   delay(1);
 
-  if (readingCnt >= maximumReadings) {
+  if (readingCnt >= maximumReadings) { 
 
-      prefs.begin("stuff", false, "nvs2");
-      //WiFi.setAutoReconnect(false);
-      //WiFi.persistent(false);
-      //WiFi.disconnect(false,true); 
+      prefs.begin("stuff", false, "nvs2"); //open up a prefs on the custom NVS2 partition
       WiFi.mode(WIFI_STA);
       WiFi.begin((char *)ssid, pass);
-      //WiFi.setTxPower(WIFI_POWER_8_5dBm);
       display.clearDisplay();   // clears the screen and buffer
       display.setCursor(0,0);
       display.print("Connecting to transmit...");
@@ -459,7 +485,6 @@ void setup(void)
         display.print(".");
         display.display();
       }
-      //WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
       if ((WiFi.status() != WL_CONNECTED) && (millis() >= WIFI_TIMEOUT)) {
 
