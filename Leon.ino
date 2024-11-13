@@ -6,7 +6,7 @@
 #include "nvs_flash.h"
 #include <SimplePgSQL.h>
 #include "time.h"
-#include <ESP32Time.h>
+//#include <ESP32Time.h>
 #include "SPI.h"
 
 
@@ -37,7 +37,7 @@ ADS1115_WE adc = ADS1115_WE(I2C_ADDRESS);
 Adafruit_AHTX0 aht;
 Adafruit_BMP280 bmp;
 
-ESP32Time rtc(-18000);  // offset in seconds
+//ESP32Time rtc(0);  // offset in seconds
 
 int16_t adc0, adc1, adc2, adc3;
 float volts0, volts1, volts2, volts3;
@@ -340,24 +340,17 @@ float readChannel(ADS1115_MUX channel) {
   return voltage;
 }
 
-void setTimezone(String timezone){
-  //Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
-  setenv("TZ",timezone.c_str(),1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
-  tzset();
-}
+
 
 void initTime(String timezone){
-  configTime(0, 0, "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
-  //delay(2500);
+  configTzTime(timezone.c_str(), "time.cloudflare.com", "pool.ntp.org", "time.nist.gov");
 
-  
   while ((!isSetNtp) && (millis() < TIME_TIMEOUT)) {
         delay(250);
         display.print(".");
         display.display();
         }
-  setTimezone(timezone);
-  getLocalTime(&timeinfo, 10000);
+
 }
 
 
@@ -395,7 +388,7 @@ void setup(void)
           }
           display.display();
           initTime("EST5EDT,M3.2.0,M11.1.0");
-          rtc.setTimeStruct(timeinfo);
+          //rtc.setTimeStruct(timeinfo);
           killwifi();
           readingCnt = 0;
           delay(1);
@@ -427,12 +420,23 @@ void setup(void)
   aht.getEvent(&humidity, &temp);
   abshum = (6.112 * pow(2.71828, ((17.67 * temp.temperature)/(temp.temperature + 243.5))) * humidity.relative_humidity * 2.1674)/(273.15 + temp.temperature); //calculate absolute humidity
   display.print("Time: ");
-  display.print(rtc.getHour());
-  if (rtc.getMinute() < 10) {display.print(":0");}
+  setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+  tzset();
+  getLocalTime(&timeinfo);
+  int hr12 = timeinfo.tm_hour;
+  String AMPM;
+  if (hr12 > 12) {
+    hr12 -= 12;
+    AMPM = "PM";
+  }
+  else {AMPM = "AM";}
+
+  display.print(hr12);
+  if (timeinfo.tm_min < 10) {display.print(":0");}
   else {display.print(":");}
   
-  display.print(rtc.getMinute());
-  display.println(rtc.getAmPm());
+  display.print(timeinfo.tm_min);
+  display.println(AMPM);
 
   display.print(temp.temperature, 2);
   display.print("C ");
@@ -462,7 +466,7 @@ void setup(void)
   //Store the sensor readings in the struct we declared earlier, using the RTC-ram integer "readingCnt" to increment the array index by one each reading
   Readings[readingCnt].temp1 = temp.temperature;    // Units °C
   Readings[readingCnt].temp2 = abshum; //humidity is temp2
-  Readings[readingCnt].time = rtc.getLocalEpoch(); 
+  Readings[readingCnt].time = mktime(&timeinfo); 
   Readings[readingCnt].volts = volts0;
   Readings[readingCnt].pres = presread;
 
