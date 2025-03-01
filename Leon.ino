@@ -77,14 +77,14 @@ float tempC;
 bool sent = false;
 
 
-IPAddress PGIP(216,110,224,105);
+IPAddress PGIP(x,x,x,x);
 
-const char ssid[] = "mikesnet";      //  your network SSID (name)
-const char pass[] = "springchicken";      // your network password
+const char ssid[] = "x";      //  your network SSID (name)
+const char pass[] = "x";      // your network password
 
-const char user[] = "wanburst";       // your database user
-const char password[] = "elec&9";   // your database password
-const char dbname[] = "blynk_reporting";         // your database name
+const char user[] = "x";       // your database user
+const char password[] = "x";   // your database password
+const char dbname[] = "x";         // your database name
 
 
 int WiFiStatus;
@@ -425,13 +425,14 @@ void setup(void)
   getLocalTime(&timeinfo);
   int hr12 = timeinfo.tm_hour;
   String AMPM;
-  if (hr12 > 12) {
+  if (hr12 >= 12) {
     hr12 -= 12;
     AMPM = "PM";
   }
   else {AMPM = "AM";}
-  if (hours == 12) {AMPM = "PM";}
+  //if (hours == 12) {AMPM = "PM";}
   if (hours == 0) {hours = 12;}
+
 
   display.print(hr12);
   if (timeinfo.tm_min < 10) {display.print(":0");}
